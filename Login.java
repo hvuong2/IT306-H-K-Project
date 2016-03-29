@@ -43,7 +43,7 @@ public class Login {
 		panel.setVisible(true);
 		
 		// Two buttons
-		String[] options = new String[]{"OK", "Cancel"};
+		String[] options = new String[]{"Login", "Cancel"};
 		int option = JOptionPane.showOptionDialog(null, panel, 
 				"Student Scheduling System Login",
 				JOptionPane.NO_OPTION, JOptionPane.QUESTION_MESSAGE,
