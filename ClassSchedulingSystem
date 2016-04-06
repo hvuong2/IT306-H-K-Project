@@ -1,0 +1,960 @@
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.List;
+
+import javax.swing.JOptionPane;
+
+public class ClassSchedulingSystem {
+
+  public static void main(String[] args) throws Exception {
+	  
+	final int MAX_STUDENTS = 10000;
+	  
+	// All counselors at the school
+  	HashMap counselors = new HashMap<>();
+  	
+  	// All students at the school
+  	HashMap students = new HashMap<>();
+  	
+  	Student testStudent = new Student("hong", "88163c52fdb7520d2da5295dcb52bff0", "hong", 16, 'M', "703-545-5555", "20120");
+  	students.put(testStudent.getUserName(), testStudent);
+  	// All classes available at the school
+  	List<Class> classes = new ArrayList<>();
+  	
+  	importCounselors(counselors);
+  	importClasses(classes);
+  	
+  	boolean login = false;
+  	boolean logout = false;
+  	
+  	User currentUser;
+  	
+  	do {
+  		while (welcomeScreen()){
+  			// Repeat login until user enters valid credentials
+  			do {
+  				logout = false;
+  				currentUser = login(counselors, students);
+  			}
+			while (currentUser == null);
+			
+			if (currentUser instanceof Counselor){
+				while (!logout){
+					logout = counselorMenu(students, counselors, (Counselor) currentUser, classes, MAX_STUDENTS, logout);
+					if (logout == true){ break; }
+				}
+			}
+			else{
+				while (!logout){
+					logout = studentMenu(students, counselors, (Student)currentUser, classes, logout);
+					if (logout == true){ break; }
+				}
+			}
+  		}
+  	}
+  	while (welcomeScreen());
+ 
+  }
+  
+	public static void importCounselors(HashMap counselors) throws IOException{
+	    BufferedReader br = new BufferedReader(new FileReader("C:\\Users\\Kevin Zuiker\\workspace\\TestImport\\src\\CounselorsTest.txt"));
+	    String line = null;
+	    while ((line = br.readLine()) != null) {
+	    	
+	    // Each value is separated by a ", "
+	      String[] values = line.split(", ");
+	      
+	      // Create counselor (username, hashed password, name, age, gender, phone number)
+	      Counselor aCounselor = new Counselor(values[0],values[1],values[2],Integer.parseInt(values[3]),values[4].charAt(0),values[5], values[6]);
+	      
+	      // Add counselor to collection of counselors
+	      counselors.put(aCounselor.getUserName(), aCounselor);
+
+	    }
+	    br.close();
+
+	}
+	
+	public static void importClasses(List<Class> classes) throws IOException{
+	    BufferedReader br = new BufferedReader(new FileReader("C:\\Users\\Kevin Zuiker\\workspace\\TestImport\\src\\Classes.txt"));
+	    String line = null;
+	    while ((line = br.readLine()) != null) {
+	      String[] values = line.split(", ");
+	      
+	      // Creates Instructor using last three values (first name, middle name, last name)
+	      Instructor aInstructor =  new Instructor(values[4],values[5],values[6]);
+	      
+	      // Creates class using id, section, name, available seats, Instructor
+	      Class aClass = new Class(values[0], values[1], values[2], Integer.parseInt(values[3]), aInstructor);
+	      
+	      // Adds the class to the collection of classes
+	      classes.add(aClass);
+	    }
+	    br.close();
+	}
+	
+	public static User login(HashMap counselors, HashMap students) throws Exception {
+		boolean valid = false;
+		Object[] options = {"Counselor", "Student"}; 
+		int userTypeNum = JOptionPane.showOptionDialog(null, "Select user type:", 
+           		"Select User Type", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, 
+           		null, options, options[0]);
+		
+		// Prompt for username
+		String username = promptForUsernameLogin();
+		
+		// Prompt for password
+		String password = promptForPasswordLogin();
+
+		
+		User aUser;
+		
+		// Selection was "Counselor"
+		if (userTypeNum == 0){
+			// Search hash map using 'username' as the key
+			if (counselors.containsKey(username)){
+				// If found, set to temporary User variable
+				aUser = (Counselor) counselors.get(username);
+				// Validates the hash password to the stored password
+
+				if (aUser.getPassword().equals(password)){
+					
+					JOptionPane.showMessageDialog(null, "Login credentials accepted. Logging in...");
+					return aUser;
+				}
+			}
+		}
+		// Selection was "Student"
+		else {
+			// Search hash map using 'username' as the key
+			if (students.containsKey(username)){
+				aUser = (Student) students.get(username);
+				// Validates the hash password to the stored password
+				if (aUser.getPassword().equals(password)){
+					JOptionPane.showMessageDialog(null, "Login credentials accepted. Logging in...");
+					return aUser;
+				}
+			}
+		}
+		
+		// If credentials are invalid, return null
+		JOptionPane.showMessageDialog(null, "Invalid login credentials! Please try again.");
+		return null;
+	}
+	
+	public static List<Class> searchForClass(List<Class> classes, Student aStudent, Schedule scheduleInProgress){
+		List<Class> searchResults = new ArrayList<>();
+
+		String search = JOptionPane.showInputDialog("Enter class to search for: ");
+		
+		// Make all letters upper case (e.g. eng will be changed to ENG)
+		search = search.toUpperCase();
+		// Retrieves all classes matching the searched criteria
+		for (Class course : classes){
+			/* Finds classes that match the searched class ID and makes sure the class
+			 * has seats available
+			 */
+			if (course.getId().contains(search) && course.getAvailableSeat() >= 1){
+				searchResults.add(course);
+			}
+		}
+		
+		//Holds values of class to be removed
+		List<Class> classesToBeRemovedFromSearchResults = new ArrayList<>();
+		
+		// Ensures there were some matched results before proceeding
+		if (searchResults.size() > 0) {
+			// Loop through all search results matching searched criteria
+			for (Class course : searchResults){
+				// Loop through all schedules of student
+				if (aStudent.getSchedules().size() > 0){
+					for (Schedule schedule : aStudent.getSchedules()) {
+						// Loop through all classes for each schedule to find classes already taken
+						for (Class classTaken : schedule.getCourses()) {
+							if (classTaken.getId().equalsIgnoreCase(course.getId()))
+							{
+								classesToBeRemovedFromSearchResults.add(course);
+							}
+						}
+					}
+				}
+				// Removes search results that are already added to the temp schedule being created
+				if (scheduleInProgress.getCourses().size() > 0){
+					for (Class courseAlreadyAdded : scheduleInProgress.getCourses()){
+						if (courseAlreadyAdded.getId().equalsIgnoreCase(course.getId()))
+						{
+							classesToBeRemovedFromSearchResults.add(course);
+						}
+					}
+				}
+			}
+			
+			if (classesToBeRemovedFromSearchResults.size() > 0) {
+				for (int i = 0; i < classesToBeRemovedFromSearchResults.size(); i++) {
+					searchResults.remove(classesToBeRemovedFromSearchResults.get(i));
+				}
+			}
+		}
+		
+		if (searchResults.size() > 0) {
+			int classStandingNum = classStandingToNum(aStudent);
+			searchResults = removeIneligbleClassStandingClasses(searchResults, classStandingNum);
+		}
+			
+		// Make sure seats are available
+		return searchResults;
+	}
+	
+	public static Student searchForStudent(HashMap students){
+		// Stores search results (e.g. a Student or null)
+		Student searchResult = new Student();
+		String search = "";
+		boolean valid = false;
+		do{
+			try{
+				search = JOptionPane.showInputDialog("Enter student username to search for: ");
+				valid = true;
+			}
+			catch(NullPointerException e){
+				JOptionPane.showMessageDialog(null, "You must enter a value!");
+			}
+		}
+		while (!valid);
+		// Converts username to all lowercase letters
+		search = search.toLowerCase();
+		
+		//
+		if (students.size() > 0 && students.containsKey(search)){
+			searchResult = ((Student)(students.get(search)));
+		}
+		else { searchResult = null; }
+		
+		return searchResult;
+	}
+	
+	public static void addStudent(HashMap students, HashMap counselors, int MAX_STUDENTS) throws Exception{
+		if (students.size() == MAX_STUDENTS){
+			JOptionPane.showMessageDialog(null, "Maximum number of students has been reached!"
+					+ "Cannot add another student.");
+		}
+		else{
+			Student studentToCreate = new Student();
+			promptAndSetUsername(studentToCreate, students, counselors);
+			promptAndSetPassword(studentToCreate);
+			promptAndSetName(studentToCreate);
+			promptAndSetAge(studentToCreate);
+			promptAndSetGender(studentToCreate);
+			promptAndSetPhoneNumber(studentToCreate);
+			promptAndSetZipCode(studentToCreate);
+			
+			students.put(studentToCreate.getUserName(), studentToCreate);
+			JOptionPane.showMessageDialog(null,  "Student successfully added to the system!");
+		}
+	}
+	
+	public static String promptForUsernameLogin(){
+		String username = "";
+		
+		do{
+			username = JOptionPane.showInputDialog("Enter username: ");
+			if (username.equals("")){
+				JOptionPane.showMessageDialog(null, "You must enter a value!");
+			}
+		}
+		while (username.equals(""));
+		
+		return username;
+	}
+
+	public static String promptForPasswordLogin() throws Exception{
+		boolean valid = false;
+		String password = "";
+		
+		do{
+			password = JOptionPane.showInputDialog("Enter password: ");
+			
+			if (!password.equals("")){
+				valid = true;
+				
+				MessageDigest md = MessageDigest.getInstance("MD5");
+				md.update(password.getBytes());
+				byte[] digest = md.digest();
+				StringBuffer sb = new StringBuffer();
+				for (byte b : digest) {
+					sb.append(String.format("%02x", b & 0xff));
+				}
+				
+				password = sb.toString();
+			}
+			if (!valid){
+				JOptionPane.showMessageDialog(null, "Invalid password. Password cannot"
+						+ "be empty! Please try again.");
+			}
+		}
+		while (!valid);
+		
+		return password;
+	}
+	
+	public static String promptAndSetPassword(Student studentToCreate) throws Exception{
+		boolean valid = false;
+		String password = "";
+		
+		do{
+			password = JOptionPane.showInputDialog("Enter password: ");
+			if (password.equals("")){
+				JOptionPane.showMessageDialog(null, "Invalid password. Password cannot"
+						+ "be empty! Please try again.");
+			}
+		}
+		while (password.equals(""));
+		
+		valid = true;
+		MessageDigest md = MessageDigest.getInstance("MD5");
+		md.update(password.getBytes());
+		byte[] digest = md.digest();
+		StringBuffer sb = new StringBuffer();
+		for (byte b : digest) {
+			sb.append(String.format("%02x", b & 0xff));
+		}
+		
+		studentToCreate.setPassword(sb.toString());
+		
+		
+		
+		return password;
+	}
+	
+	public static boolean promptAndSetName(Student studentToCreate){
+		boolean valid = false;
+		do{
+			try{
+				valid = studentToCreate.setName(JOptionPane.showInputDialog("Please enter your name: "));
+			}
+			catch (IllegalArgumentException e){
+				JOptionPane.showMessageDialog(null, e.getMessage());
+			}
+		}
+		while (!valid);
+		
+		return valid;
+	}
+	public static boolean promptAndSetAge(Student studentToCreate){
+		boolean valid = false;
+		do{
+			try{
+				valid = studentToCreate.setAge(Integer.parseInt(JOptionPane.showInputDialog("Please enter your age: ")));
+			}
+			catch (NumberFormatException e){
+				JOptionPane.showMessageDialog(null, e.getMessage());
+			}
+			catch (IllegalArgumentException e){
+				JOptionPane.showMessageDialog(null, "The age must be greater than 14 and less than 21");
+			}
+		}
+		while (!valid);
+		
+		return valid;
+	}
+	
+	public static boolean promptAndSetGender(Student aStudent){
+		char gender;
+		boolean valid = false;
+		
+		Object[] options = {"Male", "Female"};   
+
+
+		do{
+			try{
+				int genderMorF = JOptionPane.showOptionDialog(null, "Select gender:", 
+                   		"Select Gender", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, 
+                   		null, options, options[0]);
+				if (genderMorF == 0){
+					gender = 'M';
+				}
+				else { gender = 'F'; }
+				valid = aStudent.setGender(gender);
+			}
+			catch (IllegalArgumentException e){
+				JOptionPane.showMessageDialog(null, "The age must be greater than 14 and less than 100");
+			}
+		}
+		while (!valid);
+		
+		return valid;
+	}
+	
+	public static boolean promptAndSetPhoneNumber(Student studentToCreate){
+		boolean valid = false;
+		do{
+			try{
+				valid = studentToCreate.setPhoneNumber(JOptionPane.showInputDialog("Enter Phone Number (e.g. 555-555-555: "));
+			}
+			catch(IllegalArgumentException e){
+				JOptionPane.showMessageDialog(null, e.getMessage());
+			}
+		}
+		while (!valid);
+		
+		return valid;
+	}
+	
+	public static boolean promptAndSetZipCode(Student studentToCreate){
+		boolean valid = false;
+		do{
+			try{
+				valid = studentToCreate.setZipCode(JOptionPane.showInputDialog("Enter Zipcode (e.g. 20120): "));
+			}
+			catch(IllegalArgumentException e){
+				JOptionPane.showMessageDialog(null, e.getMessage());
+			}
+		}
+		while (!valid);
+		
+		return valid;
+	}
+	
+	public static boolean welcomeScreen(){
+		boolean login = false;
+		
+		Object[] options = {"Login", "Exit Program"};   
+		int loginNum = JOptionPane.showOptionDialog(null, "Welcome to the Course Scheduling System."
+				+ "What would you like to do?", 
+                       		"Login or Exit Program", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, 
+                       		null, options, options[0]);
+		
+		if (loginNum == 0){
+			login = true;
+		}
+		else {
+			JOptionPane.showMessageDialog(null, "Thank you for using the Course Scheduling System!");
+			System.exit(0);
+		}
+		
+		System.out.println(login);
+		return login;
+	}
+	
+	public static boolean counselorMenu(HashMap students, HashMap counselors, Counselor currentUser, List classes, int MAX_STUDENTS, boolean logout) throws Exception{
+	      
+	      // Holds value of the menu choice selected
+	      int menuChoice;
+	      
+	      do
+	      {
+	         // Stores menu choice input by the user
+	         menuChoice = getMenuOptionCounselor();
+	         Student aStudent;
+	         // Depending on the users input, the task associated with their numerical input will be performed
+	         switch(menuChoice)
+	         {
+	            case 1:
+	            	viewBasicInformation(currentUser);
+	            	break;      
+	            case 2:
+	            	createScheduleProcess(currentUser, students, classes);
+	               break;     
+	            case 3:
+	            	try{
+	            		aStudent = searchForStudent(students);
+	            		viewCurrentSchedule(aStudent);
+	            	}
+	            	catch (NullPointerException e){
+	            		JOptionPane.showMessageDialog(null, "Student not found!");
+	            		break;
+	            	}
+	               break;
+	            case 4:
+	            	changeSchedule(currentUser, students, classes);
+	               break;
+	            case 5:
+	            	try{
+	            		aStudent = searchForStudent(students);
+	            		viewPastSchedules(aStudent);
+	            	}
+	            	catch (NullPointerException e){
+	            		JOptionPane.showMessageDialog(null, "Student not found! Please try again.");
+	            	}
+	               break;
+	            case 6:
+            		addStudent(students, counselors, MAX_STUDENTS);
+            		break;
+	            case 7:
+	            	logout = true;
+	            	break;
+	         }
+	      }
+	      // Repeats prompt until they quit
+	      while (menuChoice != 7);
+	      
+	      return logout;
+ }
+
+	
+	public static boolean studentMenu(HashMap students, HashMap counselors, Student currentUser, List classes, boolean logout){
+
+		// Holds value of the menu choice selected
+		int menuChoice;
+		  
+		do
+		{
+			// Stores menu choice input by the user
+			menuChoice = getMenuOptionStudent();
+			 
+			// Depending on the users input, the task associated with their numerical input will be performed
+			switch(menuChoice)
+			{
+			    // Add a server to the network
+				case 1:
+					viewBasicInformation(currentUser);
+					break;
+				case 2:
+					createScheduleProcess(currentUser, students, classes);
+					break;  
+				       
+				case 3:
+					viewCurrentSchedule(currentUser);
+					break;
+				case 4:
+					viewPastSchedules(currentUser);
+					break;
+				case 5:
+					// Logs out and returns to login screen
+					logout = true;
+					break;
+			     }
+		  }
+		  // Repeats prompt until they quit
+		  while (menuChoice != 5);
+		
+		return logout;
+ }
+	
+	public static int getMenuOptionCounselor(){
+	      int menuChoice;
+	      
+	      do
+	      {
+	         try
+	         {
+	            // Prompts user to select an option from the menu
+	            menuChoice = Integer.parseInt(JOptionPane.showInputDialog("Please select a numerical option from the list below: " +
+	                                                                      "\n\n" +
+	                                                                      "1. View basic information" + "\n" +
+	                                                                      "2. Create a student’s schedule" + "\n" +
+	                                                                      "3. View a student’s schedule"  + "\n" +
+	                                                                      "4. Change a student’s schedule"  + "\n" +
+	                                                                      "5. View student’s past schedule"  + "\n" +
+	                                                                      "6. Add a student"  + "\n" +
+	                                                                      "7. Log out"));
+	         }
+	         //If the user does not provide a numeric value, an exception will be thrown
+	         catch (NumberFormatException e)
+	         {
+	            menuChoice = 0;
+	         }
+	         // Displays an error if the numerical input does not match any of the options
+	         if (menuChoice < 1 || menuChoice > 7)
+	         {
+	            JOptionPane.showMessageDialog(null, "Invalid choice. Please enter a valid menu operation.");
+	         }
+	      }
+	      // Continues to repeat if the user does not select an option from the list
+	      while (menuChoice < 1 || menuChoice > 7);
+	      
+	      // Returns the menu choice selected
+	      return menuChoice;
+	}
+	
+	public static int getMenuOptionStudent(){
+	      int menuChoice;
+	      
+	      do
+	      {
+	         try
+	         {
+	            // Prompts user to select an option from the menu
+	            menuChoice = Integer.parseInt(JOptionPane.showInputDialog("Please select a numerical option from the list below: " +
+	                                                                      "\n\n" +
+	                                                                      "1. View basic information" + "\n" +
+	                                                                      "2. Create a schedule" + "\n" +
+	                                                                      "3. View their current schedule" + "\n" +
+	                                                                      "4. View past schedule(s)" + "\n" +
+	                                                                      "5. Logout"));
+	         }
+	         //If the user does not provide a numeric value, an exception will be thrown
+	         catch (NumberFormatException e)
+	         {
+	            menuChoice = 0;
+	         }
+	         // Displays an error if the numerical input does not match any of the options
+	         if (menuChoice < 1 || menuChoice > 5)
+	         {
+	            JOptionPane.showMessageDialog(null, "Invalid choice. Please enter a valid menu operation.");
+	         }
+	      }
+	      // Continues to repeat if the user does not select an option from the list
+	      while (menuChoice < 1 || menuChoice > 5);
+	      
+	      // Returns the menu choice selected
+	      return menuChoice;
+	}
+	
+	public static void viewBasicInformation(User user){
+		String output = "*** Basic Information *** \n\n";
+		JOptionPane.showMessageDialog(null, user.toString());
+	}
+	
+	public static void viewCurrentSchedule(Student aStudent){
+		int currentYear = Calendar.getInstance().get(Calendar.YEAR);
+		int previousYear = (currentYear - 1);
+		
+		// Concatenates the two years (e.g. 2015-2016)
+		String yearsToSearch = previousYear + "-" + currentYear;
+		
+		String scheduleOutput = "*** Current Schedule ***" + "\n";
+				
+		// Determines if the user has at least 1 schedule
+		if (aStudent.getSchedules().size() == 0){
+			// No schedules error message
+			JOptionPane.showMessageDialog(null, "Student does not have a current"
+												+ "schedule!");
+		}
+		else if (aStudent.getSchedules().size() == 1){
+			// Displays current schedule
+			JOptionPane.showMessageDialog(null, (aStudent.getSchedules().get(0).toString()));
+		}
+		else {
+			// Loops through all schedules the student has
+			for (Schedule schedule : aStudent.getSchedules()){
+				// Finds the schedule with the current year
+				if (schedule.getSchoolYear().equals(yearsToSearch)){
+					// Displays current schedule
+					JOptionPane.showMessageDialog(null, schedule.toString());
+					break;
+				}
+			}
+		}
+	}
+	
+	public static void viewPastSchedules(Student aStudent){
+		String pastSchedulesOutput = "*** Past Schedules*** \n";
+		
+		// Determines if the user has at least 1 schedule
+		if (aStudent.getSchedules().size() == 0){
+			// No schedules error message
+			JOptionPane.showMessageDialog(null, "Student does not have any"
+												+ "schedules!");
+		}
+		else if (aStudent.getSchedules().size() == 1){
+			// Current schedule only error message
+			JOptionPane.showMessageDialog(null, "Student only has a current"
+					+ "schedule! Please use the View Current Schedule feature"
+					+ "to view the current schedule.");
+		}
+		else {
+			
+			// Loops through all schedules the student has up to the current schedule
+			for (int i = 0; i < (aStudent.getSchedules().size()-1); i++){
+				pastSchedulesOutput += aStudent.getSchedules().get(i) + "\n\n";
+			}
+			
+			// Displays all previous schedules
+			JOptionPane.showMessageDialog(null, pastSchedulesOutput);
+		}
+	}
+	
+	public static boolean promptAndSetUsername(Student studentToCreate, HashMap counselors, HashMap students){
+		boolean valid = false;
+		String username;
+		do{
+			try{
+				do{
+					username = JOptionPane.showInputDialog("Please enter your username: ");
+				}
+				while (username.equals(""));
+				username = username.toLowerCase();
+			
+				if (!students.containsKey(username) && !counselors.containsKey(username)){
+					valid = true;
+				}
+				valid = studentToCreate.setUserName(username);
+			}
+			catch (IllegalArgumentException e){
+				JOptionPane.showMessageDialog(null, e.getMessage());
+			}
+		}
+		while (!valid);
+		
+		return valid;
+	}
+	
+	public static Class displayClassesAndSelectClass(List classes, Student aStudent)
+	{
+		
+		String searchResultsDisplay;
+		int courseToAddNum = -1;
+		do{
+			searchResultsDisplay = "";
+			searchResultsDisplay += "*** Search Results *** \n\n";
+			for (int i = 0; i < classes.size(); i++){
+				searchResultsDisplay += i+1 + ". " + ((Class)classes.get(i)).getId() + "\n";
+				
+			}
+			
+			searchResultsDisplay += "0. Cancel \n\n" +
+									"Please select a course you wish to add.";
+			
+			boolean valid = false;
+			do{
+				try {
+					courseToAddNum = Integer.parseInt(JOptionPane.showInputDialog(searchResultsDisplay));
+					valid = true;
+				}
+				catch (NumberFormatException e){
+					JOptionPane.showMessageDialog(null, "You must enter a number!");
+					courseToAddNum = -1;
+				}
+			}
+			while (!valid);
+		}
+		while (courseToAddNum == -1);
+		Class classToAdd;
+		
+		if (courseToAddNum != 0){
+			classToAdd = (Class)classes.get(courseToAddNum-1);
+		}
+		else{
+			classToAdd = null;
+		}
+		
+		return classToAdd;
+	}
+	
+	public static List removeIneligbleClassStandingClasses(List<Class> searchResults, int classStandingNum){
+		// Ensure search results is not empty
+		if (searchResults.size() > 0) {
+			// Loop through all search results
+			for (int i = 0; i < searchResults.size(); i++){
+				// Loop through each character in the class Id
+				for (int j = 0; i < searchResults.get(i).getId().length(); j++) {
+					// Find the first number in class Id and compare to class standing number
+					if (Character.isDigit(searchResults.get(i).getId().charAt(j))){
+						searchResults.remove(i);
+					}
+					break;
+				}
+			}
+		}
+		
+		return searchResults;
+			
+	}
+	
+	public static int classStandingToNum(Student aStudent){
+		int classStandingNum = 0;
+        switch(aStudent.getClassStanding())
+        {
+           case "Freshman":
+	           	classStandingNum = 1;
+	           	break;      
+           case "Sophomore":
+        	   classStandingNum = 2;
+        	   break;     
+           case "Junior":
+        	   classStandingNum = 3;
+        	   break;
+           case "Senior":
+        	   classStandingNum = 4;
+               break;
+               // Should never run
+           default:
+        	   classStandingNum = 0;
+        	   break;
+        }
+		
+        return classStandingNum;
+	}
+	
+	public static void createScheduleProcess(User aCurrentUser, HashMap students, List classes){
+		if (aCurrentUser instanceof Student) {
+	           Student aStudent = (Student) aCurrentUser;
+	           Schedule newSchedule = createASchedule(classes, aStudent);
+	           if (newSchedule == null) {
+	               JOptionPane.showMessageDialog(null, "The schedule has not been saved.");
+	           } else {
+	               aStudent.saveSchedule(aStudent, newSchedule);
+	               JOptionPane.showMessageDialog(null, "Schedule has been successfully saved.");
+	           }
+	       }
+
+	       if (aCurrentUser instanceof Counselor) {
+	    	   try{
+	    		   Student aStudent = searchForStudent(students);
+		           Schedule newSchedule = createASchedule(classes, aStudent);
+		           
+		           if (newSchedule == null) {
+		        	   JOptionPane.showMessageDialog(null, "The schedule has not been saved.");
+		           } else {
+		               aStudent.saveSchedule(aStudent, newSchedule);
+		           }
+	    	   }
+	    	   catch (NullPointerException e){
+	    		   JOptionPane.showMessageDialog(null, "Student not found! Please try again.");
+	    	   }
+
+	       }
+	}
+	
+   public static Schedule createASchedule(List classes, Student aStudent) {
+       ArrayList<Schedule> aScheduleList;
+       aScheduleList = aStudent.getSchedules();
+
+       int numOfSchedule;
+       try{
+    	   numOfSchedule = aScheduleList.size();
+       }
+       catch(NullPointerException e){
+    	   numOfSchedule = 0;
+       }
+
+       if (numOfSchedule == 4) {
+           System.out.println("Student already has 4 schedules. Additional schedules cannot be created.");
+           return null;
+       }
+
+       Schedule aTempSchedule = new Schedule(getCurrentYear());
+       ArrayList classList = aTempSchedule.getCourses();
+       
+       String continuePrompt = "This schedule currently has " +
+       classList.size() + "/7 classes. \nDo you wish to add another class. Click \"No\" to cancel.";
+       do{
+    	   List results = searchForClass(classes, aStudent, aTempSchedule);
+    	   if (results.size() > 0) {
+	    	   Class selectedClass = displayClassesAndSelectClass(results, aStudent);
+	           aStudent.addClass(selectedClass, aTempSchedule);
+    	   }
+    	   else{
+    		   JOptionPane.showMessageDialog(null, "No classes found matching your search!");
+    	   }
+       }
+       while (classList.size() < 7 && JOptionPane.showConfirmDialog(null, continuePrompt) ==
+               JOptionPane.YES_OPTION);
+       
+       if (classList.size() != 7){
+    	   return null;
+       }
+       else {
+    	   return aTempSchedule; }
+   }
+   
+   public static String getCurrentYear(){
+	   int currentYear = Calendar.getInstance().get(Calendar.YEAR);
+       int nextYear = (currentYear + 1);
+       
+       return currentYear + "-" + nextYear;
+   }
+   
+   public static void changeSchedule(Counselor currentUser, HashMap students, List classes){
+	   Student searchedStudent = searchForStudent(students);
+	   if (searchedStudent != null){
+		   Schedule currentSchedule = returnCurrentSchedule(searchedStudent);
+		   if (currentSchedule != null){
+			   int option = changeScheduleMenu(currentSchedule);
+			   if (option == 0){
+				   selectClassToAdd(currentUser, searchedStudent, currentSchedule, classes);
+			   }
+			   else {
+				   selectClassToRemove(currentUser, searchedStudent, currentSchedule);
+			   }
+		   }
+	   }
+	   else {
+		   JOptionPane.showMessageDialog(null, "Student not found!");
+	   }
+   }
+   
+   public static Schedule returnCurrentSchedule(Student aStudent) {
+       int currentYear = Calendar.getInstance().get(Calendar.YEAR);
+       int nextYear = (currentYear + 1);
+
+       ArrayList<Schedule> wholeSchedule = aStudent.getSchedules();
+
+       Schedule referenceToBeReturned = null;
+       // Concatenates the two years (e.g. 2015-2016)
+       String yearsToSearch = currentYear + "-" + nextYear;
+
+       // Determines if the user has at least 1 schedule
+       if (wholeSchedule.size() == 0) {
+           // No schedules error message
+           JOptionPane.showMessageDialog(null, "Student does not any schedules!");
+           referenceToBeReturned = null;
+       } else if (wholeSchedule.size() == 1) {
+           // Displays current schedule
+           referenceToBeReturned = wholeSchedule.get(0);
+       } else {
+           // Loops through all schedules the student has
+           for (Schedule e : wholeSchedule) {
+               // Finds the schedule with the current year
+               if (e.getSchoolYear().equals(yearsToSearch)) {
+                   // Displays current schedule
+                   referenceToBeReturned = e;
+                   break;
+               }
+           }
+       }
+
+       return referenceToBeReturned;
+   }
+   
+   public static void selectClassToRemove(Counselor currentUser, Student aStudent, Schedule currentSchedule){
+	   
+	   if (currentSchedule.getCourses().size() >= 1){
+		   String removeOutput = "*** Please select a class to remove *** \n\n";
+		   for (int i = 0; i < currentSchedule.getCourses().size(); i++){
+			   removeOutput += i+1 + ". " + currentSchedule.getCourses().get(i) + "\n";
+		   }
+		   
+		   boolean valid = false;
+		   int selection = 0;
+		   do
+		   {
+			   selection = Integer.parseInt(JOptionPane.showInputDialog(removeOutput));
+		   }
+		   while (selection < 0 || selection > currentSchedule.getCourses().size());
+		   currentUser.remove(aStudent, currentSchedule.getCourses().get(selection-1), currentSchedule);
+	   }
+	   else{
+		   JOptionPane.showMessageDialog(null, "You do not have any classes in your schedule to remove!");
+	   }
+   }
+   
+   public static void selectClassToAdd(Counselor currentUser, Student aStudent, Schedule currentSchedule, List classes){
+	   if (currentSchedule.getCourses().size() < 7){
+		   List searchResults = searchForClass(classes, aStudent, currentSchedule);
+		   aStudent.addClass(displayClassesAndSelectClass(classes, aStudent), currentSchedule);
+	   }
+	   else{
+		   JOptionPane.showMessageDialog(null, "The schedule is full! Additional classes cannot be added");
+	   }
+   }
+   
+   public static int changeScheduleMenu(Schedule currentSchedule){
+	   String changeScheduleMenu = "";
+		for (int i = 0; i < currentSchedule.getCourses().size(); i++){
+			changeScheduleMenu += i+1 + ". " + ((Class)currentSchedule.getCourses().get(i)).getId() + "\n";
+		}
+	   changeScheduleMenu += "\nPlease selection an option";
+	   Object[] options = {"Add Class", "Remove Class"}; 
+		int optionTypeNum = JOptionPane.showOptionDialog(null, changeScheduleMenu, 
+           		"Select Add Remove Class", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, 
+           		null, options, options[0]);
+		
+		return optionTypeNum;
+   }
+  }
