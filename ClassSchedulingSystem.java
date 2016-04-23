@@ -68,7 +68,7 @@ public class ClassSchedulingSystem {
   public static void main(String[] args) throws Exception {
 	  
 	final int MAX_STUDENTS = 10000;
-	  
+
 	// All counselors at the school
   	HashMap counselors = new HashMap<>();
   	
@@ -272,7 +272,7 @@ public class ClassSchedulingSystem {
 		String search;
 		do {
 			// Prompt user for search criteria
-			search = JOptionPane.showInputDialog("Enter class to search for: ");
+			search = JOptionPane.showInputDialog("Enter class to search for: \n"+ "(e.g. You can enter a full class ID (e.g. IT105) or partial class ID (e.g. IT)");
 			if (search == null){
 				// User hits cancel button
 				throw new IllegalArgumentException();
@@ -543,7 +543,7 @@ public class ClassSchedulingSystem {
 		do{
 			try{
 				// Prompt for name
-				valid = studentToCreate.setName(JOptionPane.showInputDialog("Please enter your name (must not contain digits): "));
+				valid = studentToCreate.setName(JOptionPane.showInputDialog("Please enter student's first and last name (must not contain digits): "));
 			}
 			// Error message if it does not pass validation
 			catch (IllegalArgumentException e){
@@ -565,7 +565,7 @@ public class ClassSchedulingSystem {
 		do{
 			try{
 				// Prompt for age
-				valid = studentToCreate.setAge(Integer.parseInt(JOptionPane.showInputDialog("Please enter your age (between 14 and 19): ")));
+				valid = studentToCreate.setAge(Integer.parseInt(JOptionPane.showInputDialog("Please enter student's age (between 14 and 19): ")));
 			}
 			// Error message if not a number
 			catch (NumberFormatException e){
@@ -599,7 +599,7 @@ public class ClassSchedulingSystem {
 		do{
 			try{
 				// Prompt for gender (returns numerical value)
-				int genderMorF = JOptionPane.showOptionDialog(null, "Select gender:", 
+				int genderMorF = JOptionPane.showOptionDialog(null, "Select student's gender:", 
                    		"Select Gender", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, 
                    		null, options, options[0]);
 				
@@ -631,7 +631,7 @@ public class ClassSchedulingSystem {
 		do{
 			try{
 				// Prompt for phone number
-				valid = studentToCreate.setPhoneNumber(JOptionPane.showInputDialog("Enter Phone Number (e.g. 555-555-5555): "));
+				valid = studentToCreate.setPhoneNumber(JOptionPane.showInputDialog("Enter student's phone number (e.g. 555-555-5555): "));
 			}
 			// Error if it does not pass validation
 			catch(IllegalArgumentException e){
@@ -865,10 +865,10 @@ public class ClassSchedulingSystem {
 	            menuChoice = Integer.parseInt(JOptionPane.showInputDialog("Please select a numerical option from the list below: " +
 	                                                                      "\n\n" +
 	                                                                      "1. View basic information" + "\n" +
-	                                                                      "2. Create a studentâ€™s schedule" + "\n" +
-	                                                                      "3. View a studentâ€™s schedule"  + "\n" +
-	                                                                      "4. Change a studentâ€™s schedule"  + "\n" +
-	                                                                      "5. View studentâ€™s past schedule"  + "\n" +
+	                                                                      "2. Create a student’s schedule" + "\n" +
+	                                                                      "3. View a student’s schedule"  + "\n" +
+	                                                                      "4. Change a student’s schedule"  + "\n" +
+	                                                                      "5. View student’s past schedule"  + "\n" +
 	                                                                      "6. Add a student"  + "\n" +
 	                                                                      "7. Log out"));
 	         }
@@ -1049,8 +1049,10 @@ public class ClassSchedulingSystem {
 	{
 		// Search results to display
 		String searchResultsDisplay = "";;
-		// Default numeber
+		// Default number
+		String courseToAdd = "";
 		int courseToAddNum = -1;
+		
 		do{
 			searchResultsDisplay += "*** Search Results *** \n\n";
 			// Displays classes with a numerical value
@@ -1060,14 +1062,22 @@ public class ClassSchedulingSystem {
 				
 			}
 			
-			searchResultsDisplay += "0. Cancel \n\n" +
-									"Please select a course you wish to add.";
+			searchResultsDisplay += "\nPlease select a course you wish to add.";
 			
 			boolean valid = false;
 			do{
 				try {
 					// Prompts for numerical selection associated with a class on the menu
-					courseToAddNum = Integer.parseInt(JOptionPane.showInputDialog(searchResultsDisplay));
+					courseToAdd = JOptionPane.showInputDialog(searchResultsDisplay);
+					
+					// User clicks "Cancel" button
+					if (courseToAdd == null){
+						return null;
+					}
+					else
+					{
+						courseToAddNum = Integer.parseInt(courseToAdd);
+					}
 					valid = true;
 				}
 				// Error if non-numerical value is entered
@@ -1106,17 +1116,11 @@ public class ClassSchedulingSystem {
 		if (searchResults.size() > 0) {
 			// Loop through all search results
 			for (int i = 0; i < searchResults.size(); i++){
-				System.out.println("Currently on class: " + (i+1) + "/" + searchResults.size());
 				// Loop through each character in the class Id
 				for (int j = 0; j < (searchResults.get(i).getId().length())-1; j++) {
-					System.out.println("searchResults.get(i).getId(): " + searchResults.get(i).getId());
 					// Find the first number in class Id and compare to class standing number
 					if (Character.isDigit(searchResults.get(i).getId().charAt(j))){
-						System.out.println(("(searchResults.get(i).getId().charAt(j) (" + searchResults.get(i).getId().charAt(j)) + ") != classStandingNum " + classStandingNum + ")");
-						System.out.println(Character.getNumericValue(searchResults.get(i).getId().charAt(j)) != classStandingNum);
 						if (Character.getNumericValue(searchResults.get(i).getId().charAt(j)) != classStandingNum){
-							System.out.println("Search Results Size: " + searchResults.size());
-							System.out.println("Removed: " + searchResults.get(i).getId());
 							classesToRemove.add(searchResults.get(i));
 							break;
 						}
@@ -1218,7 +1222,7 @@ public class ClassSchedulingSystem {
    public static Schedule createASchedule(List classes, Student aStudent) {
        ArrayList<Schedule> schedulesForStudent;
        schedulesForStudent = aStudent.getSchedules();
-
+       
        int numOfSchedules;
        try{
     	   // Determines number of schedule a student has
@@ -1266,9 +1270,12 @@ public class ClassSchedulingSystem {
     	   }
        }
        // Continue while class schedule is not full and they wish to continue
-       while (aTempSchedule.getCourses().size() < 7 && JOptionPane.showConfirmDialog(null, "This schedule currently has " +
-    		   aTempSchedule.getCourses().size() + "/7 classes. \nDo you wish to add another class. Click \"No\" to cancel.") ==
-               JOptionPane.YES_OPTION);
+       while (aTempSchedule.getCourses().size() < 7 && ((JOptionPane.showConfirmDialog(
+			    null,
+			    "This schedule currently has " +
+			    		   aTempSchedule.getCourses().size() + "/7 classes. \nDo you wish to add another class. Click \"No\" to cancel.",
+			    "Add another class",
+			    JOptionPane.YES_NO_OPTION)) == 0));
        
        // Unfinished schedule
        if (aTempSchedule.getCourses().size() != 7){
